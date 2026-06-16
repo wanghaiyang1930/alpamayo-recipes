@@ -36,6 +36,48 @@ logger.setLevel("INFO")
 CLIP_RELATIVE_DURATION_US = 20_000_000
 
 
+def _parse_chunk_ids(chunk_ids: Any) -> list[int]:
+    """Parse ``chunk_ids`` into a flat list of ints.
+
+    Accepted forms:
+      * ``int``: single chunk id, e.g. ``5`` -> ``[5]``.
+      * ``list``/``tuple``/iterable of ints: returned as a list.
+      * ``str``: comma-separated parts, each part is either a single int or a
+        half-open ``"start-end"`` range. Whitespace around parts is ignored.
+        Examples:
+          - ``"0-99"``         -> ``[0, 1, ..., 98]``  (half-open, kept for
+                                  backward compat with existing configs)
+          - ``"10, 11, 15-18"`` -> ``[10, 11, 15, 16, 17]``
+          - ``"7"``             -> ``[7]``
+
+    Raises ``ValueError`` for malformed strings and ``TypeError`` for
+    unsupported types.
+    """
+    if isinstance(chunk_ids, bool):
+        # bool is an int subclass in Python; reject it explicitly.
+        raise TypeError(f"Invalid chunk_ids type: {type(chunk_ids).__name__}")
+    if isinstance(chunk_ids, int):
+        return [chunk_ids]
+    if isinstance(chunk_ids, str):
+        ids: list[int] = []
+        for raw_part in chunk_ids.split(","):
+            part = raw_part.strip()
+            if not part:
+                continue
+            if "-" in part:
+                bounds = part.split("-")
+                if len(bounds) != 2 or not bounds[0].strip() or not bounds[1].strip():
+                    raise ValueError(f"Malformed range segment: {raw_part!r}")
+                start, end = int(bounds[0]), int(bounds[1])
+                ids.extend(range(start, end))
+            else:
+                ids.append(int(part))
+        return ids
+    if isinstance(chunk_ids, (list, tuple, Iterable)):
+        return [int(c) for c in chunk_ids]
+    raise TypeError(f"Invalid chunk_ids type: {type(chunk_ids).__name__}")
+
+
 class PhysicalAIAVDatasetLocalInterface:
     """Local filesystem interface for a PAI AV dataset.
 
@@ -57,22 +99,18 @@ class PhysicalAIAVDatasetLocalInterface:
 
         Args:
             local_dir: Path to the local directory containing the PAI dataset.
-            chunk_ids: List of chunk IDs to load, or a range string (e.g. "0-9").
-                      If None, all available chunks will be loaded.
+            chunk_ids: Chunk IDs to load. Accepts an int, a list/tuple of ints,
+                or a string of comma-separated single ids and/or half-open
+                ranges (e.g. "0-99" or "10, 11, 15-18"). If None, all available
+                chunks are loaded.
         """
         self.local_dir = local_dir
         self.chunk_ids = None
         if chunk_ids is not None:
-            if isinstance(chunk_ids, str) and "-" in chunk_ids:
-                chunk_start = int(chunk_ids.split("-")[0])
-                chunk_end = int(chunk_ids.split("-")[1])
-                self.chunk_ids = list(range(chunk_start, chunk_end))
-            elif isinstance(chunk_ids, (list, tuple, Iterable)):
-                self.chunk_ids = list(chunk_ids)
-            elif isinstance(chunk_ids, int):
-                self.chunk_ids = [chunk_ids]
-            else:
-                logger.error(f"Invalid chunk_ids: {chunk_ids} {type(chunk_ids)}")
+            try:
+                self.chunk_ids = _parse_chunk_ids(chunk_ids)
+            except (ValueError, TypeError) as exc:
+                logger.error(f"Invalid chunk_ids: {chunk_ids!r} ({exc})")
         else:
             logger.info("Loading all chunks")
 

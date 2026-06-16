@@ -1,0 +1,3 @@
+_target_: alpamayo1_5_sft.models.sft_base_model.TrainableReasoningVLA.from_vlm_pretrained
+_recursive_: false
+vlm_name_or_path: Qwen/Qwen3-VL-8B-Instruct

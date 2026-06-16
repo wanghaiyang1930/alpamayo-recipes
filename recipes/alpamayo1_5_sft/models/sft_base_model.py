@@ -169,6 +169,41 @@ class TrainableReasoningVLA(ReasoningVLA, TrajectoryFusionWithFutureMixin):
         super().__init__(config, pretrained_modules, original_vocab_size, print_param_count)
 
     @classmethod
+    def from_vlm_pretrained(
+        cls,
+        vlm_name_or_path: str = "Qwen/Qwen3-VL-8B-Instruct",
+        model_dtype: str = "bfloat16",
+        attn_implementation: str = "flash_attention_2",
+        min_pixels: int | None = None,
+        max_pixels: int | None = None,
+        traj_tokenizer_cfg: dict[str, Any] | None = None,
+        hist_traj_tokenizer_cfg: dict[str, Any] | None = None,
+        traj_vocab_size: int | None = None,
+        tokens_per_history_traj: int = 16,
+        tokens_per_future_traj: int = 64,
+        add_special_tokens: bool = False,
+        **kwargs: Any,
+    ) -> "TrainableReasoningVLA":
+        """Initialize from a pretrained VLM (optionally with trajectory components).
+
+        Can be used for pure VQA (no traj args) or nav training (with traj args).
+        """
+        config = ReasoningVLAConfig(
+            vlm_name_or_path=vlm_name_or_path,
+            traj_tokenizer_cfg=traj_tokenizer_cfg,
+            hist_traj_tokenizer_cfg=hist_traj_tokenizer_cfg,
+            traj_vocab_size=traj_vocab_size,
+            tokens_per_history_traj=tokens_per_history_traj,
+            tokens_per_future_traj=tokens_per_future_traj,
+            add_special_tokens=add_special_tokens,
+            model_dtype=model_dtype,
+            attn_implementation=attn_implementation,
+            min_pixels=min_pixels,
+            max_pixels=max_pixels,
+        )
+        return cls.from_pretrained_submodules(config)
+
+    @classmethod
     def from_alpamayo_checkpoint(
         cls,
         checkpoint_path: str,

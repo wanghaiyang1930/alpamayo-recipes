@@ -1,6 +1,7 @@
 key: null
-team: ???
-project: ???
+team: wanghaiyang1930
+project: alpamayo1.5-sft
 group: ${run_name}
 name: ${run_name}
+mode: offline
 output_dir: ${paths.output_dir}
